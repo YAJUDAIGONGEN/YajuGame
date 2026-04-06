@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>いけないお薬パニック</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            font-family: "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN", "Yu Gothic", "游ゴシック", sans-serif;
+            overflow: hidden; 
+            touch-action: none; 
+            -webkit-user-select: none; 
+            color: #fff;
+        }
+        #game-container { position: relative; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+        
+        .game-img { width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0; display: none; z-index: 5; }
+
+        #white-out {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #fff; opacity: 0; z-index: 90; pointer-events: none;
+            transition: opacity 2.5s linear;
+        }
+
+        #effect-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; opacity: 0; z-index: 95; pointer-events: none;
+        }
+        .red-pulse { animation: redPulse 1s infinite ease-in-out; }
+        @keyframes redPulse { 0%, 100% { background-color: #000; } 50% { background-color: #800; } }
+
+        #kui-text {
+            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
+            font-size: clamp(30px, 8vw, 50px); color: #fff; font-weight: 900;
+            text-shadow: 2px 2px 10px #f00, -2px -2px 10px #f00;
+            z-index: 105; display: none; pointer-events: none; white-space: nowrap;
+        }
+        #caught-text {
+            position: absolute; bottom: 25%; left: 5%; width: 90%;
+            background: #fff; border: 6px solid #ff5252; border-radius: 30px;
+            padding: 15px 0; font-size: 24px; color: #ff5252; font-weight: 900;
+            text-align: center; z-index: 100; display: none; pointer-events: none;
+            box-shadow: 0 10px 0 rgba(0,0,0,0.1);
+        }
+
+        #nu-img { 
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+            width: 140px; height: auto; z-index: 65; display: none; pointer-events: none; 
+            animation: hop 0.2s infinite;
+        }
+        @keyframes hop { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
+
+        #ui-layer { 
+            position: absolute; bottom: 30px; width: 90%; z-index: 50; 
+            text-align: center; background: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 20px;
+        }
+        #score-label { font-size: 14px; color: #ff4081; font-weight: 900; margin-bottom: 2px; }
+        #score-bar { width: 100%; height: 20px; background: #eee; border: 3px solid #ff4081; border-radius: 50px; overflow: hidden; margin-bottom: 5px; }
+        #score-fill { width: 0%; height: 100%; background: #ff4081; transition: width 0.1s; }
+        #score-value { font-size: 16px; color: #ff4081; font-weight: 900; text-shadow: 1px 1px 0 #fff; letter-spacing: -0.5px; }
+
+        .screen { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 110; box-sizing: border-box; }
+        #screen-init { background-color: #000; cursor: pointer; }
+        #init-guide { font-size: 24px; font-weight: bold; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        #screen-logo { background-color: #000; display: none; }
+        /* 初期状態は非表示にする */
+        #logo-img { width: 60%; max-width: 400px; height: auto; display: none; }
+        #screen-start { background-color: #000; cursor: pointer; display: none; }
+        #title-img { width: 100%; height: 100%; object-fit: contain; }
+
+        .btn { background: #4caf50; color: #fff; border: none; padding: 15px 40px; font-size: 20px; font-weight: 900; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #2e7d32; z-index: 120; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 4px 0 #2e7d32; }
+        .result-btn { position: absolute; bottom: 80px; min-width: 120px; font-size: 16px; z-index: 130; }
+        .retry-btn { left: 30px; background: #ff9800; box-shadow: 0 8px 0 #ef6c00; }
+        .menu-btn { right: 30px; }
+
+        .hidden { display: none !important; }
+        .warning-flash { animation: rainbow 0.1s infinite; }
+        @keyframes rainbow { 0% { filter: hue-rotate(0deg) brightness(1.2); } 100% { filter: hue-rotate(360deg) brightness(1.5); } }
+
+        #img-safe-layer { position: absolute; width: 100%; height: 100%; object-fit: contain; z-index: 6; display: none; }
+        #img-dosing-group { position: absolute; width: 100%; height: 100%; z-index: 10; display: none; pointer-events: none; }
+        .dosing-img { position: absolute; width: 100%; height: 100%; object-fit: contain; top:0; left:0; opacity: 0; }
+
+        .is-dosing-safely #img-dosing { animation: kyoroBase 3s infinite linear; }
+        .is-dosing-safely #img-ue { animation: kyoroUe 3s infinite linear; }
+        .is-dosing-safely #img-migi2 { animation: kyoroMigi2 3s infinite linear; }
+
+        @keyframes kyoroBase {
+            0%, 30%, 50%, 80%, 100% { opacity: 1; }
+            35%, 45%, 65%, 75% { opacity: 0; }
+        }
+        @keyframes kyoroUe {
+            0%, 30%, 50%, 100% { opacity: 0; }
+            35%, 45% { opacity: 1; }
+        }
+        @keyframes kyoroMigi2 {
+            0%, 50%, 80%, 100% { opacity: 0; }
+            65%, 75% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <img id="img-safe-layer" src="image_4.png">
+    
+    <div id="img-dosing-group">
+        <img id="img-dosing" class="dosing-img" src="image_9.png">
+        <img id="img-ue" class="dosing-img" src="Ue.png">
+        <img id="img-migi2" class="dosing-img" src="Migi2.png">
+    </div>
+
+    <img id="img-look" class="game-img" src="image_0.png">
+    <img id="img-over" class="game-img" src="image_6.png">
+    <img id="img-clear" class="game-img" src="image_13.png">
+
+    <div id="white-out"></div>
+    <div id="effect-layer"></div> 
+
+    <img id="nu-img" src="Nu.png">
+    
+    <div id="kui-text">†悔い改めて†</div>
+    <div id="caught-text">せんぱい、<br>なにしてるんですか？</div>
+
+    <div id="ui-layer" class="hidden">
+        <div id="score-label">じょうずに いれられるかな？</div>
+        <div id="score-bar"><div id="score-fill"></div></div>
+        <div id="score-value">0 / 1,145,141,919,810 グラム</div>
+    </div>
+
+    <audio id="se-piko" src="piko.wav" preload="auto"></audio>
+    <audio id="se-title" src="Dede.mp3" preload="auto"></audio>
+    <audio id="se-start" src="Yaju1.wav" preload="auto"></audio>
+    <audio id="se-loop" src="Sara1.mp3" preload="auto" loop></audio>
+    <audio id="se-poli" src="Poli.mp3" preload="auto"></audio>
+    <audio id="se-kakutei" src="Kakutei.wav" preload="auto"></audio>
+    <audio id="bgm-end" src="Endbgm.mp3" preload="auto" loop></audio>
+    <audio id="se-yamete" src="Yamete.wav" preload="auto"></audio>
+    <audio id="se-kui" src="Kui.wav" preload="auto"></audio>
+    <audio id="se-yarimasu" src="Yarimasu.wav" preload="auto"></audio>
+    <audio id="se-kaiwa" src="Kaiwa.mp3" preload="auto"></audio>
+
+    <div id="screen-init" class="screen" onclick="handleFirstTap()">
+        <div id="init-guide">がめんをタップしてね！</div>
+    </div>
+    <div id="screen-logo" class="screen">
+        <img id="logo-img" src="Yajucoin.png">
+    </div>
+    <div id="screen-start" class="screen" onclick="handleSecondTap()">
+        <img id="title-img" src="image7.png">
+    </div>
+
+    <div id="screen-over" class="screen hidden" style="background:none;">
+        <button onclick="handleRetry()" class="btn result-btn retry-btn">もういっかい</button>
+    </div>
+    <div id="screen-clear" class="screen hidden" style="background:none;">
+        <button onclick="handleRetry()" class="btn result-btn menu-btn">おわり</button>
+    </div>
+</div>
+
+<script>
+    let score = 0;
+    const MAX_SCORE = 1145141919810;
+    const TARGET_SECONDS = 25; 
+    const SCORE_STEP = MAX_SCORE / (TARGET_SECONDS * 60);
+
+    let isTapping = false;
+    let state = 'INIT'; 
+    let gameActive = false;
+    let lookGracePeriod = false;
+
+    const audios = {
+        piko: document.getElementById('se-piko'),
+        title: document.getElementById('se-title'),
+        start: document.getElementById('se-start'),
+        loop: document.getElementById('se-loop'),
+        poli: document.getElementById('se-poli'),
+        kakutei: document.getElementById('se-kakutei'),
+        end: document.getElementById('bgm-end'),
+        yamete: document.getElementById('se-yamete'),
+        kui: document.getElementById('se-kui'),
+        yarimasu: document.getElementById('se-yarimasu'),
+        kaiwa: document.getElementById('se-kaiwa')
+    };
+
+    const imgs = {
+        look: document.getElementById('img-look'),
+        over: document.getElementById('img-over'),
+        clear: document.getElementById('img-clear')
+    };
+
+    const imgSafeLayer = document.getElementById('img-safe-layer');
+    const imgDosingGroup = document.getElementById('img-dosing-group');
+    const logoImg = document.getElementById('logo-img'); // ロゴ画像要素
+    const whiteOut = document.getElementById('white-out');
+    const effectLayer = document.getElementById('effect-layer');
+    const kuiText = document.getElementById('kui-text');
+    const caughtText = document.getElementById('caught-text');
+    const scoreValue = document.getElementById('score-value');
+    const container = document.getElementById('game-container');
+    const initScreen = document.getElementById('screen-init');
+    const logoScreen = document.getElementById('screen-logo');
+    const startScreen = document.getElementById('screen-start');
+    const nuImg = document.getElementById('nu-img');
+
+    function stopAllAudio() {
+        Object.values(audios).forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+        });
+    }
+
+    function handleRetry() {
+        stopAllAudio();
+        location.reload();
+    }
+
+    function showImg(key) {
+        Object.values(imgs).forEach(img => img.style.display = 'none');
+        if(imgs[key]) imgs[key].style.display = 'block';
+    }
+
+    // --- ここを修正：タイミングの精密コントロール ---
+    function handleFirstTap() {
+        if (state !== 'INIT') return;
+        state = 'LOGO_PENDING'; // 内部状態
+
+        // 音声制限解除
+        Object.values(audios).forEach(audio => {
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+            }).catch(e => {});
+        });
+
+        // 1. 真っ暗なロゴ画面へ切り替え
+        initScreen.style.display = 'none';
+        logoScreen.style.display = 'flex';
+        logoImg.style.display = 'none'; // 画像はまだ隠す
+
+        // 2. 1秒待機
+        setTimeout(() => {
+            // 3. piko再生
+            audios.piko.currentTime = 0;
+            audios.piko.play().catch(e => {});
+
+            // 4. その0.2秒後にロゴ表示
+            setTimeout(() => {
+                logoImg.style.display = 'block';
+                state = 'LOGO_SHOWING';
+
+                // さらに3.8秒後にタイトル画面へ（合計5秒）
+                setTimeout(() => {
+                    logoScreen.style.display = 'none';
+                    startScreen.style.display = 'flex';
+                    state = 'START';
+                    audios.title.play().catch(e => {});
+                }, 3800);
+            }, 200); 
+        }, 1000); 
+    }
+
+    function handleSecondTap() {
+        if (state !== 'START') return;
+        audios.title.pause();
+        audios.title.currentTime = 0;
+        state = 'SAFE';
+        startScreen.style.display = 'none';
+        document.getElementById('ui-layer').classList.remove('hidden');
+        audios.start.play().catch(e => {});
+        
+        setTimeout(() => {
+            if (gameActive) {
+                audios.kaiwa.play().catch(e => {});
+            }
+        }, 4000);
+
+        gameActive = true;
+        imgSafeLayer.style.display = 'block';
+        gameLoop();
+        scheduleLook();
+    }
+
+    function gameLoop() {
+        if (!gameActive) return;
+
+        if (isTapping) {
+            if (state === 'LOOK' && !lookGracePeriod) { 
+                gameOverCaught(); 
+                return; 
+            }
+
+            score += SCORE_STEP;
+            updateScoreUI();
+
+            if (state !== 'LOOK') {
+                imgSafeLayer.style.display = 'none';
+                imgDosingGroup.style.display = 'block';
+                imgDosingGroup.classList.add('is-dosing-safely');
+            } else {
+                resetDosingState();
+            }
+
+            if (audios.loop.paused) audios.loop.play().catch(e => {});
+        } else {
+            resetDosingState();
+            if (state === 'LOOK') {
+                imgSafeLayer.style.display = 'none'; 
+                showImg('look');
+            } else {
+                showImg(''); 
+                imgSafeLayer.style.display = 'block';
+            }
+            if (!audios.loop.paused) { audios.loop.pause(); audios.loop.currentTime = 0; }
+        }
+
+        if (score >= MAX_SCORE) { 
+            startClearSequence(); 
+            return; 
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resetDosingState() {
+        imgDosingGroup.style.display = 'none';
+        imgDosingGroup.classList.remove('is-dosing-safely');
+        if (state !== 'LOOK') imgSafeLayer.style.display = 'block';
+    }
+
+    function updateScoreUI() {
+        const displayScore = Math.min(Math.floor(score), MAX_SCORE);
+        scoreValue.innerText = `${displayScore.toLocaleString()} / 1,145,141,919,810 グラム`;
+        document.getElementById('score-fill').style.width = Math.min((score / MAX_SCORE) * 100, 100) + '%';
+    }
+
+    function scheduleLook() {
+        if (!gameActive || state === 'CLEARING' || state === 'CAUGHT') return;
+        const randBase = Math.random();
+        let nextLook = (randBase < 0.2) ? 500 : (randBase < 0.8) ? 1500 : 4000;
+        
+        setTimeout(() => {
+            if (!gameActive || state === 'CLEARING' || state === 'CAUGHT') return;
+            state = 'WARNING';
+            imgSafeLayer.classList.add('warning-flash');
+            imgDosingGroup.classList.add('warning-flash');
+
+            const reactionTime = 600 - ((score / MAX_SCORE) * 300);
+
+            setTimeout(() => {
+                if (!gameActive || state === 'CAUGHT' || state === 'CLEARING') return;
+                imgSafeLayer.classList.remove('warning-flash');
+                imgDosingGroup.classList.remove('warning-flash');
+                
+                state = 'LOOK';
+                lookGracePeriod = true; 
+                setTimeout(() => { lookGracePeriod = false; }, 100);
+                
+                imgSafeLayer.style.display = 'none';
+                imgDosingGroup.style.display = 'none'; 
+                nuImg.style.display = 'block';
+                showImg('look');
+                
+                setTimeout(() => {
+                    if (!gameActive || state === 'CAUGHT' || state === 'CLEARING') return;
+                    state = 'SAFE';
+                    nuImg.style.display = 'none';
+                    showImg('');
+                    imgSafeLayer.style.display = 'block';
+                    scheduleLook();
+                }, 1000); 
+            }, reactionTime); 
+        }, nextLook);
+    }
+
+    function startClearSequence() {
+        gameActive = false;
+        state = 'CLEARING';
+        isTapping = false;
+        audios.loop.pause();
+        whiteOut.style.opacity = '1';
+        audios.kakutei.play().catch(e => {});
+        setTimeout(() => {
+            audios.yarimasu.play().catch(e => {});
+            audios.end.play().catch(e => {});
+            gameClear();
+            whiteOut.style.opacity = '0';
+        }, 2500); 
+    }
+
+    function gameOverCaught() {
+        gameActive = false;
+        state = 'CAUGHT'; 
+        isTapping = false;
+        audios.loop.pause();
+        audios.kaiwa.pause();
+        nuImg.style.display = 'none';
+        imgSafeLayer.classList.remove('warning-flash');
+        imgDosingGroup.classList.remove('warning-flash');
+        document.getElementById('ui-layer').classList.add('hidden');
+        imgSafeLayer.style.display = 'none';
+        imgDosingGroup.style.display = 'none';
+        showImg('look'); 
+        caughtText.style.display = 'block'; 
+        audios.yamete.play().catch(e => {});
+        effectLayer.style.transition = 'opacity 3s linear';
+        effectLayer.style.opacity = '1';
+        setTimeout(() => {
+            caughtText.style.display = 'none';
+            effectLayer.classList.add('red-pulse'); 
+            audios.poli.play().catch(e => {});
+            setTimeout(() => {
+                showImg('over'); 
+                effectLayer.style.transition = 'opacity 3s ease-out';
+                effectLayer.style.opacity = '0'; 
+                setTimeout(() => {
+                    effectLayer.classList.remove('red-pulse');
+                    kuiText.style.display = 'block';
+                    audios.kui.play().catch(e => {});
+                    document.getElementById('screen-over').classList.remove('hidden');
+                }, 3000);
+            }, 1000);
+        }, 3000);
+    }
+
+    function gameClear() {
+        nuImg.style.display = 'none';
+        imgSafeLayer.style.display = 'none';
+        imgDosingGroup.style.display = 'none';
+        showImg('clear');
+        document.getElementById('ui-layer').classList.add('hidden');
+        document.getElementById('screen-clear').classList.remove('hidden');
+    }
+
+    container.addEventListener('touchstart', (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } }, {passive: false});
+    container.addEventListener('touchend', () => { isTapping = false; });
+    container.addEventListener('mousedown', () => { if(gameActive) isTapping = true; });
+    container.addEventListener('mouseup', () => { isTapping = false; });
+</script>
+</body>
+</html>
+lay = 'none';
+        showImg('clear');
+        document.getElementById('ui-layer').classList.add('hidden');
+        document.getElementById('screen-clear').classList.remove('hidden');
+    }
+
+    container.addEventListener('touchstart', (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } }, {passive: false});
+    container.addEventListener('touchend', () => { isTapping = false; });
+    container.addEventListener('mousedown', () => { if(gameActive) isTapping = true; });
+    container.addEventListener('mouseup', () => { isTapping = false; });
+</script>
+</body>
+</html>
+      gameClear();
+            whiteOut.style.opacity = '0';
+        }, 2500); 
+    }
+
+    function gameOverCaught() {
+        gameActive = false;
+        state = 'CAUGHT'; 
+        isTapping = false;
+        audios.loop.pause();
+        waitText.style.display = 'none';
+        alertMark.style.display = 'none';
+        document.getElementById('ui-layer').classList.add('hidden');
+        
+        imgSafeLayer.style.display = 'none';
+        dosingGroup.style.display = 'none';
+        dosingGroup.classList.remove('is-dosing');
+
+        showImg('look'); caughtText.style.display = 'block'; 
+        audios.yamete.play().catch(e => {});
+        effectLayer.style.transition = 'opacity 3s linear';
+        effectLayer.style.opacity = '1';
+        setTimeout(() => {
+            caughtText.style.display = 'none';
+            effectLayer.classList.add('red-pulse'); 
+            audios.poli.volume = 0.5;
+            audios.poli.play().catch(e => {});
+            setTimeout(() => {
+                showImg('over'); 
+                effectLayer.style.transition = 'opacity 3s ease-out';
+                effectLayer.style.opacity = '0'; 
+                setTimeout(() => {
+                    effectLayer.classList.remove('red-pulse');
+                    kuiText.style.display = 'block';
+                    audios.kui.play().catch(e => {});
+                    document.getElementById('screen-over').classList.remove('hidden');
+                }, 3000);
+            }, 1000);
+        }, 3000);
+    }
+
+    function gameClear() {
+        waitText.style.display = 'none';
+        imgSafeLayer.style.display = 'none';
+        dosingGroup.style.display = 'none';
+        dosingGroup.classList.remove('is-dosing');
+        showImg('clear');
+        document.getElementById('ui-layer').classList.add('hidden');
+        document.getElementById('screen-clear').classList.remove('hidden');
+    }
+
+    container.ontouchstart = (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } };
+    container.ontouchend = () => { isTapping = false; };
+    container.onmousedown = () => { if(gameActive) isTapping = true; };
+    container.onmouseup = () => { isTapping = false; };
+</script>
+</body>
+</html>
+ne';
+        // 【修正】ここでも念のため
+        imgSafeLayer.style.display = 'none';
+        dosingGroup.style.display = 'none';
+        dosingGroup.classList.remove('is-dosing');
+        showImg('clear');
+        document.getElementById('ui-layer').classList.add('hidden');
+        document.getElementById('screen-clear').classList.remove('hidden');
+    }
+
+    container.ontouchstart = (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } };
+    container.ontouchend = () => { isTapping = false; };
+    container.onmousedown = () => { if(gameActive) isTapping = true; };
+    container.onmouseup = () => { isTapping = false; };
+</script>
+</body>
+</html>
