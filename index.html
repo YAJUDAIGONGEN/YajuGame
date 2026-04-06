@@ -2,19 +2,42 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>いけないお薬パニック</title>
     <style>
+        /* 基本リセット */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            /* dvhが使えない古いブラウザ用のフォールバック */
+            height: 100vh;
+            /* 常に実際に見えている高さに合わせる */
+            height: 100dvh;
+            background: #000;
+            overflow: hidden;
+            position: fixed; /* スクロールを完全に禁止 */
+        }
+
         body { 
-            margin: 0; 
-            background: #000; 
             font-family: "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN", "Yu Gothic", "游ゴシック", sans-serif;
-            overflow: hidden; 
             touch-action: none; 
             -webkit-user-select: none; 
             color: #fff;
         }
-        #game-container { position: relative; width: 100vw; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+
+        #game-container { 
+            position: relative; 
+            width: 100%; 
+            height: 100%; 
+            background: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            box-sizing: border-box;
+        }
         
         .game-img { width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0; display: none; z-index: 5; }
 
@@ -66,7 +89,6 @@
         #init-guide { font-size: 24px; font-weight: bold; animation: blink 1.5s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         #screen-logo { background-color: #000; display: none; }
-        /* 初期状態は非表示にする */
         #logo-img { width: 60%; max-width: 400px; height: auto; display: none; }
         #screen-start { background-color: #000; cursor: pointer; display: none; }
         #title-img { width: 100%; height: 100%; object-fit: contain; }
@@ -107,22 +129,18 @@
 
 <div id="game-container">
     <img id="img-safe-layer" src="image_4.png">
-    
     <div id="img-dosing-group">
         <img id="img-dosing" class="dosing-img" src="image_9.png">
         <img id="img-ue" class="dosing-img" src="Ue.png">
         <img id="img-migi2" class="dosing-img" src="Migi2.png">
     </div>
-
     <img id="img-look" class="game-img" src="image_0.png">
     <img id="img-over" class="game-img" src="image_6.png">
     <img id="img-clear" class="game-img" src="image_13.png">
 
     <div id="white-out"></div>
     <div id="effect-layer"></div> 
-
     <img id="nu-img" src="Nu.png">
-    
     <div id="kui-text">†悔い改めて†</div>
     <div id="caught-text">せんぱい、<br>なにしてるんですか？</div>
 
@@ -163,6 +181,8 @@
 </div>
 
 <script>
+    // JSロジック（ロゴの待機演出、点滅中投入、ゲームループ等）は
+    // 前回の「1秒待ってpiko再生→0.2秒後ロゴ」版を完全に継承しています。
     let score = 0;
     const MAX_SCORE = 1145141919810;
     const TARGET_SECONDS = 25; 
@@ -195,7 +215,7 @@
 
     const imgSafeLayer = document.getElementById('img-safe-layer');
     const imgDosingGroup = document.getElementById('img-dosing-group');
-    const logoImg = document.getElementById('logo-img'); // ロゴ画像要素
+    const logoImg = document.getElementById('logo-img');
     const whiteOut = document.getElementById('white-out');
     const effectLayer = document.getElementById('effect-layer');
     const kuiText = document.getElementById('kui-text');
@@ -224,36 +244,21 @@
         if(imgs[key]) imgs[key].style.display = 'block';
     }
 
-    // --- ここを修正：タイミングの精密コントロール ---
     function handleFirstTap() {
         if (state !== 'INIT') return;
-        state = 'LOGO_PENDING'; // 内部状態
-
-        // 音声制限解除
+        state = 'LOGO_PENDING';
         Object.values(audios).forEach(audio => {
-            audio.play().then(() => {
-                audio.pause();
-                audio.currentTime = 0;
-            }).catch(e => {});
+            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(e => {});
         });
-
-        // 1. 真っ暗なロゴ画面へ切り替え
         initScreen.style.display = 'none';
         logoScreen.style.display = 'flex';
-        logoImg.style.display = 'none'; // 画像はまだ隠す
-
-        // 2. 1秒待機
+        logoImg.style.display = 'none';
         setTimeout(() => {
-            // 3. piko再生
             audios.piko.currentTime = 0;
             audios.piko.play().catch(e => {});
-
-            // 4. その0.2秒後にロゴ表示
             setTimeout(() => {
                 logoImg.style.display = 'block';
                 state = 'LOGO_SHOWING';
-
-                // さらに3.8秒後にタイトル画面へ（合計5秒）
                 setTimeout(() => {
                     logoScreen.style.display = 'none';
                     startScreen.style.display = 'flex';
@@ -272,13 +277,7 @@
         startScreen.style.display = 'none';
         document.getElementById('ui-layer').classList.remove('hidden');
         audios.start.play().catch(e => {});
-        
-        setTimeout(() => {
-            if (gameActive) {
-                audios.kaiwa.play().catch(e => {});
-            }
-        }, 4000);
-
+        setTimeout(() => { if (gameActive) audios.kaiwa.play().catch(e => {}); }, 4000);
         gameActive = true;
         imgSafeLayer.style.display = 'block';
         gameLoop();
@@ -287,16 +286,10 @@
 
     function gameLoop() {
         if (!gameActive) return;
-
         if (isTapping) {
-            if (state === 'LOOK' && !lookGracePeriod) { 
-                gameOverCaught(); 
-                return; 
-            }
-
+            if (state === 'LOOK' && !lookGracePeriod) { gameOverCaught(); return; }
             score += SCORE_STEP;
             updateScoreUI();
-
             if (state !== 'LOOK') {
                 imgSafeLayer.style.display = 'none';
                 imgDosingGroup.style.display = 'block';
@@ -304,24 +297,14 @@
             } else {
                 resetDosingState();
             }
-
             if (audios.loop.paused) audios.loop.play().catch(e => {});
         } else {
             resetDosingState();
-            if (state === 'LOOK') {
-                imgSafeLayer.style.display = 'none'; 
-                showImg('look');
-            } else {
-                showImg(''); 
-                imgSafeLayer.style.display = 'block';
-            }
+            if (state === 'LOOK') { imgSafeLayer.style.display = 'none'; showImg('look'); }
+            else { showImg(''); imgSafeLayer.style.display = 'block'; }
             if (!audios.loop.paused) { audios.loop.pause(); audios.loop.currentTime = 0; }
         }
-
-        if (score >= MAX_SCORE) { 
-            startClearSequence(); 
-            return; 
-        }
+        if (score >= MAX_SCORE) { startClearSequence(); return; }
         requestAnimationFrame(gameLoop);
     }
 
@@ -341,29 +324,23 @@
         if (!gameActive || state === 'CLEARING' || state === 'CAUGHT') return;
         const randBase = Math.random();
         let nextLook = (randBase < 0.2) ? 500 : (randBase < 0.8) ? 1500 : 4000;
-        
         setTimeout(() => {
             if (!gameActive || state === 'CLEARING' || state === 'CAUGHT') return;
             state = 'WARNING';
             imgSafeLayer.classList.add('warning-flash');
             imgDosingGroup.classList.add('warning-flash');
-
             const reactionTime = 600 - ((score / MAX_SCORE) * 300);
-
             setTimeout(() => {
                 if (!gameActive || state === 'CAUGHT' || state === 'CLEARING') return;
                 imgSafeLayer.classList.remove('warning-flash');
                 imgDosingGroup.classList.remove('warning-flash');
-                
                 state = 'LOOK';
                 lookGracePeriod = true; 
                 setTimeout(() => { lookGracePeriod = false; }, 100);
-                
                 imgSafeLayer.style.display = 'none';
                 imgDosingGroup.style.display = 'none'; 
                 nuImg.style.display = 'block';
                 showImg('look');
-                
                 setTimeout(() => {
                     if (!gameActive || state === 'CAUGHT' || state === 'CLEARING') return;
                     state = 'SAFE';
@@ -377,156 +354,36 @@
     }
 
     function startClearSequence() {
-        gameActive = false;
-        state = 'CLEARING';
-        isTapping = false;
-        audios.loop.pause();
-        whiteOut.style.opacity = '1';
-        audios.kakutei.play().catch(e => {});
-        setTimeout(() => {
-            audios.yarimasu.play().catch(e => {});
-            audios.end.play().catch(e => {});
-            gameClear();
-            whiteOut.style.opacity = '0';
-        }, 2500); 
+        gameActive = false; state = 'CLEARING'; isTapping = false; audios.loop.pause();
+        whiteOut.style.opacity = '1'; audios.kakutei.play().catch(e => {});
+        setTimeout(() => { audios.yarimasu.play().catch(e => {}); audios.end.play().catch(e => {}); gameClear(); whiteOut.style.opacity = '0'; }, 2500); 
     }
 
     function gameOverCaught() {
-        gameActive = false;
-        state = 'CAUGHT'; 
-        isTapping = false;
-        audios.loop.pause();
-        audios.kaiwa.pause();
-        nuImg.style.display = 'none';
-        imgSafeLayer.classList.remove('warning-flash');
-        imgDosingGroup.classList.remove('warning-flash');
-        document.getElementById('ui-layer').classList.add('hidden');
-        imgSafeLayer.style.display = 'none';
-        imgDosingGroup.style.display = 'none';
-        showImg('look'); 
-        caughtText.style.display = 'block'; 
-        audios.yamete.play().catch(e => {});
-        effectLayer.style.transition = 'opacity 3s linear';
-        effectLayer.style.opacity = '1';
+        gameActive = false; state = 'CAUGHT'; isTapping = false; audios.loop.pause(); audios.kaiwa.pause();
+        nuImg.style.display = 'none'; imgSafeLayer.classList.remove('warning-flash'); imgDosingGroup.classList.remove('warning-flash');
+        document.getElementById('ui-layer').classList.add('hidden'); imgSafeLayer.style.display = 'none'; imgDosingGroup.style.display = 'none';
+        showImg('look'); caughtText.style.display = 'block'; audios.yamete.play().catch(e => {});
+        effectLayer.style.transition = 'opacity 3s linear'; effectLayer.style.opacity = '1';
         setTimeout(() => {
-            caughtText.style.display = 'none';
-            effectLayer.classList.add('red-pulse'); 
-            audios.poli.play().catch(e => {});
+            caughtText.style.display = 'none'; effectLayer.classList.add('red-pulse'); audios.poli.play().catch(e => {});
             setTimeout(() => {
-                showImg('over'); 
-                effectLayer.style.transition = 'opacity 3s ease-out';
-                effectLayer.style.opacity = '0'; 
-                setTimeout(() => {
-                    effectLayer.classList.remove('red-pulse');
-                    kuiText.style.display = 'block';
-                    audios.kui.play().catch(e => {});
-                    document.getElementById('screen-over').classList.remove('hidden');
-                }, 3000);
+                showImg('over'); effectLayer.style.transition = 'opacity 3s ease-out'; effectLayer.style.opacity = '0'; 
+                setTimeout(() => { effectLayer.classList.remove('red-pulse'); kuiText.style.display = 'block'; audios.kui.play().catch(e => {});
+                    document.getElementById('screen-over').classList.remove('hidden'); }, 3000);
             }, 1000);
         }, 3000);
     }
 
     function gameClear() {
-        nuImg.style.display = 'none';
-        imgSafeLayer.style.display = 'none';
-        imgDosingGroup.style.display = 'none';
-        showImg('clear');
-        document.getElementById('ui-layer').classList.add('hidden');
-        document.getElementById('screen-clear').classList.remove('hidden');
+        nuImg.style.display = 'none'; imgSafeLayer.style.display = 'none'; imgDosingGroup.style.display = 'none';
+        showImg('clear'); document.getElementById('ui-layer').classList.add('hidden'); document.getElementById('screen-clear').classList.remove('hidden');
     }
 
     container.addEventListener('touchstart', (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } }, {passive: false});
     container.addEventListener('touchend', () => { isTapping = false; });
     container.addEventListener('mousedown', () => { if(gameActive) isTapping = true; });
     container.addEventListener('mouseup', () => { isTapping = false; });
-</script>
-</body>
-</html>
-lay = 'none';
-        showImg('clear');
-        document.getElementById('ui-layer').classList.add('hidden');
-        document.getElementById('screen-clear').classList.remove('hidden');
-    }
-
-    container.addEventListener('touchstart', (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } }, {passive: false});
-    container.addEventListener('touchend', () => { isTapping = false; });
-    container.addEventListener('mousedown', () => { if(gameActive) isTapping = true; });
-    container.addEventListener('mouseup', () => { isTapping = false; });
-</script>
-</body>
-</html>
-      gameClear();
-            whiteOut.style.opacity = '0';
-        }, 2500); 
-    }
-
-    function gameOverCaught() {
-        gameActive = false;
-        state = 'CAUGHT'; 
-        isTapping = false;
-        audios.loop.pause();
-        waitText.style.display = 'none';
-        alertMark.style.display = 'none';
-        document.getElementById('ui-layer').classList.add('hidden');
-        
-        imgSafeLayer.style.display = 'none';
-        dosingGroup.style.display = 'none';
-        dosingGroup.classList.remove('is-dosing');
-
-        showImg('look'); caughtText.style.display = 'block'; 
-        audios.yamete.play().catch(e => {});
-        effectLayer.style.transition = 'opacity 3s linear';
-        effectLayer.style.opacity = '1';
-        setTimeout(() => {
-            caughtText.style.display = 'none';
-            effectLayer.classList.add('red-pulse'); 
-            audios.poli.volume = 0.5;
-            audios.poli.play().catch(e => {});
-            setTimeout(() => {
-                showImg('over'); 
-                effectLayer.style.transition = 'opacity 3s ease-out';
-                effectLayer.style.opacity = '0'; 
-                setTimeout(() => {
-                    effectLayer.classList.remove('red-pulse');
-                    kuiText.style.display = 'block';
-                    audios.kui.play().catch(e => {});
-                    document.getElementById('screen-over').classList.remove('hidden');
-                }, 3000);
-            }, 1000);
-        }, 3000);
-    }
-
-    function gameClear() {
-        waitText.style.display = 'none';
-        imgSafeLayer.style.display = 'none';
-        dosingGroup.style.display = 'none';
-        dosingGroup.classList.remove('is-dosing');
-        showImg('clear');
-        document.getElementById('ui-layer').classList.add('hidden');
-        document.getElementById('screen-clear').classList.remove('hidden');
-    }
-
-    container.ontouchstart = (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } };
-    container.ontouchend = () => { isTapping = false; };
-    container.onmousedown = () => { if(gameActive) isTapping = true; };
-    container.onmouseup = () => { isTapping = false; };
-</script>
-</body>
-</html>
-ne';
-        // 【修正】ここでも念のため
-        imgSafeLayer.style.display = 'none';
-        dosingGroup.style.display = 'none';
-        dosingGroup.classList.remove('is-dosing');
-        showImg('clear');
-        document.getElementById('ui-layer').classList.add('hidden');
-        document.getElementById('screen-clear').classList.remove('hidden');
-    }
-
-    container.ontouchstart = (e) => { if(gameActive) { e.preventDefault(); isTapping = true; } };
-    container.ontouchend = () => { isTapping = false; };
-    container.onmousedown = () => { if(gameActive) isTapping = true; };
-    container.onmouseup = () => { isTapping = false; };
 </script>
 </body>
 </html>
